@@ -213,10 +213,11 @@
 
     <!-- MARK -->
     <div id="tab-mark" class="section">
-      <div class="week-nav">
-        <button onclick="shiftWeek(-1)">&#8592;</button>
-        <span class="week-label" id="week-label"></span>
-        <button onclick="shiftWeek(1)">&#8594;</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
+        <button id="prev-day-btn" style="width:32px;height:36px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:none;cursor:pointer;color:var(--text);font-size:18px;line-height:1">&#8592;</button>
+        <input type="date" id="mark-date" style="flex:1;height:36px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:0 12px" />
+        <button id="next-day-btn" style="width:32px;height:36px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:none;cursor:pointer;color:var(--text);font-size:18px;line-height:1">&#8594;</button>
+        <button id="today-btn" style="height:36px;padding:0 12px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:none;cursor:pointer;color:var(--text2);font-size:12px;font-family:'DM Mono',monospace;white-space:nowrap">today</button>
       </div>
       <div id="day-cards"></div>
     </div>
@@ -265,7 +266,6 @@ const db = getFirestore(app);
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 let state = { timetable: [], attendance: {} };
 let currentUser = null;
-let weekOffset = 0;
 let saveTimer = null;
 let unsubscribe = null;
 
@@ -306,7 +306,15 @@ function listenToData() {
     } else {
       state = { timetable: [], attendance: {} };
     }
-    renderAll();
+    const _markDateInp = document.getElementById('mark-date');
+if (_markDateInp) {
+  _markDateInp.value = dateKey(new Date());
+  _markDateInp.addEventListener('change', renderMark);
+  document.getElementById('prev-day-btn').addEventListener('click', () => window.shiftDay(-1));
+  document.getElementById('next-day-btn').addEventListener('click', () => window.shiftDay(1));
+  document.getElementById('today-btn').addEventListener('click', window.goToday);
+}
+renderAll();
   });
 }
 
@@ -436,23 +444,26 @@ function renderDashboard() {
 }
 
 function renderMark() {
-  const dates = getWeekDates(weekOffset);
-  const mon=dates[0], fri=dates[dates.length-1];
-  const fmt = d => d.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
-  document.getElementById('week-label').textContent = `${fmt(mon)} – ${fmt(fri)}`;
+  const dateInput = document.getElementById('mark-date');
+  if (!dateInput) return;
+  const dk = dateInput.value;
+  if (!dk) return;
+  const [y,m,d] = dk.split('-').map(Number);
+  const dateObj = new Date(y, m-1, d);
   const today = dateKey(new Date());
-  let html='';
-  for (const d of dates) {
-    const dk = dateKey(d);
-    const lecs = getLecturesForDate(d);
-    if (!lecs.length) continue;
-    const isToday = dk===today;
-    const isPast = dk<=today;
-    const dayName = DAYS[(d.getDay()+6)%7];
-    html += `<div class="card ${isToday?'today':''}">
-      <div class="card-header">
+  const isToday = dk === today;
+  const isPast = dk <= today;
+  const dayName = DAYS[(dateObj.getDay()+6)%7];
+  const lecs = getLecturesForDate(dateObj);
+
+  let html = '';
+  if (!lecs.length) {
+    html = `<div class="card"><div class="empty" style="padding:1.5rem">No lectures scheduled on ${dayName}.</div></div>`;
+  } else {
+    html = `<div class="card">
+      <div class="card-header" style="margin-bottom:8px">
         <span class="card-title">${dayName}${isToday?' <span style="font-size:10px;background:rgba(99,102,241,0.2);color:#a5b4fc;padding:2px 8px;border-radius:99px;font-weight:500">today</span>':''}</span>
-        <span class="card-sub">${d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}</span>
+        <span class="card-sub">${dateObj.toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</span>
       </div>`;
     for (const lec of lecs) {
       const ak = attKey(dk, lec.subj, lec.time);
@@ -469,7 +480,6 @@ function renderMark() {
     }
     html += '</div>';
   }
-  if (!html) html = '<div class="empty">No lectures this week. Add subjects in Timetable.</div>';
   document.getElementById('day-cards').innerHTML = html;
   document.getElementById('day-cards').querySelectorAll('.tick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -521,7 +531,17 @@ window.addLecture = () => {
   scheduleSave();
   renderAll();
 };
-window.shiftWeek = d => { weekOffset+=d; renderMark(); };
+window.shiftDay = delta => {
+  const inp = document.getElementById('mark-date');
+  const [y,m,d] = inp.value.split('-').map(Number);
+  const nd = new Date(y, m-1, d+delta);
+  inp.value = dateKey(nd);
+  renderMark();
+};
+window.goToday = () => {
+  document.getElementById('mark-date').value = dateKey(new Date());
+  renderMark();
+};
 window.showTab = name => {
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dashboard','mark','timetable'][i]===name));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));

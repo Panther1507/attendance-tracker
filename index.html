@@ -296,6 +296,19 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
+let selectedDateKey = dateKey(new Date());
+
+function initMarkTab() {
+  const inp = document.getElementById('mark-date');
+  if (!inp || inp._inited) return;
+  inp._inited = true;
+  inp.value = selectedDateKey;
+  inp.addEventListener('change', () => { selectedDateKey = inp.value; renderMark(); });
+  document.getElementById('prev-day-btn').addEventListener('click', () => window.shiftDay(-1));
+  document.getElementById('next-day-btn').addEventListener('click', () => window.shiftDay(1));
+  document.getElementById('today-btn').addEventListener('click', window.goToday);
+}
+
 function listenToData() {
   const ref = doc(db, 'users', currentUser.uid, 'data', 'main');
   unsubscribe = onSnapshot(ref, snap => {
@@ -306,15 +319,8 @@ function listenToData() {
     } else {
       state = { timetable: [], attendance: {} };
     }
-    const _markDateInp = document.getElementById('mark-date');
-if (_markDateInp) {
-  _markDateInp.value = dateKey(new Date());
-  _markDateInp.addEventListener('change', renderMark);
-  document.getElementById('prev-day-btn').addEventListener('click', () => window.shiftDay(-1));
-  document.getElementById('next-day-btn').addEventListener('click', () => window.shiftDay(1));
-  document.getElementById('today-btn').addEventListener('click', window.goToday);
-}
-renderAll();
+    initMarkTab();
+    renderAll();
   });
 }
 
@@ -445,8 +451,8 @@ function renderDashboard() {
 
 function renderMark() {
   const dateInput = document.getElementById('mark-date');
-  if (!dateInput) return;
-  const dk = dateInput.value;
+  if (dateInput) dateInput.value = selectedDateKey;
+  const dk = selectedDateKey;
   if (!dk) return;
   const [y,m,d] = dk.split('-').map(Number);
   const dateObj = new Date(y, m-1, d);
@@ -532,14 +538,17 @@ window.addLecture = () => {
   renderAll();
 };
 window.shiftDay = delta => {
-  const inp = document.getElementById('mark-date');
-  const [y,m,d] = inp.value.split('-').map(Number);
+  const [y,m,d] = selectedDateKey.split('-').map(Number);
   const nd = new Date(y, m-1, d+delta);
-  inp.value = dateKey(nd);
+  selectedDateKey = dateKey(nd);
+  const inp = document.getElementById('mark-date');
+  if (inp) inp.value = selectedDateKey;
   renderMark();
 };
 window.goToday = () => {
-  document.getElementById('mark-date').value = dateKey(new Date());
+  selectedDateKey = dateKey(new Date());
+  const inp = document.getElementById('mark-date');
+  if (inp) inp.value = selectedDateKey;
   renderMark();
 };
 window.showTab = name => {
